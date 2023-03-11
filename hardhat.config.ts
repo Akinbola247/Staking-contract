@@ -10,9 +10,14 @@ const config: HardhatUserConfig = {
       forking: {
         url: "https://eth-mainnet.g.alchemy.com/v2/xypdsCZYrlk6oNi93UmpUzKE9kmxHy2n",
       }
-    }
+    },
+    // goerli: {
+    //   url: process.env.GOERLI_RPC,
+    //   //@ts-ignore
+    //   accounts: [process.env.PRIVATE_KEY]
+    // }
   }
-  
+
 };
 
 export default config;

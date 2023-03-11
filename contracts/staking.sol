@@ -19,69 +19,86 @@ contract staking {
         uint amount;
         uint initialStaketime;
         bool stakeStatus;
+        uint tokenEarned;
     }
-    mapping(address => uint) rewardTracker;
+
     mapping (address=>stakerDetail) stakers;
 
 function stake(uint _amount) public {
-    require(allowedStakeToken.balanceOf(msg.sender) >= _amount, "Insufficient funds");
-    require(approveFunc(_amount) >= _amount, "Approve before staking");
-    allowedStakeToken.allowance(msg.sender, address(this));
-    stakerDetail storage staker = stakers[msg.sender];
-        if(stakers[msg.sender].stakeStatus == true){
-            calculateReward();
-            staker.amount += _amount;
-            staker.initialStaketime = block.timestamp; 
+    stakerDetail memory stakerMem = stakers[msg.sender];
+        if(stakerMem.stakeStatus == true){
+            uint _Amount = stakerMem.amount;
+            uint rewardTime = block.timestamp - stakerMem.initialStaketime;   
+            uint reward = (rewardTime * 5 * _Amount) / (SECONDS_PER_YEAR * 100); 
+            stakerMem.initialStaketime = block.timestamp;
+            stakerMem.tokenEarned += reward;
+            stakerMem.amount += _amount;
+            stakerMem.initialStaketime = block.timestamp; 
+            stakers[msg.sender] = stakerMem;
         }else {     
-       staker.amount = _amount;
-       staker.initialStaketime = block.timestamp;
-       staker.stakeStatus = true;
+       stakerMem.amount = _amount;
+       stakerMem.initialStaketime = block.timestamp;
+       stakerMem.stakeStatus = true;
+       stakers[msg.sender] = stakerMem;
         } 
     allowedStakeToken.transferFrom(msg.sender, address(this), _amount);
     }
 
-    function approveFunc(uint _amount) public returns(uint) {
-          allowedStakeToken.approve(address(this), _amount);
-          return _amount;
+    function calculateReward() public view returns(uint){
+    stakerDetail memory stakerMem = stakers[msg.sender];
+    uint _Amount = stakerMem.amount;
+    uint rewardTime = block.timestamp - stakerMem.initialStaketime;   
+    uint reward = (rewardTime * 5 * _Amount) / (SECONDS_PER_YEAR * 100); 
+        return(reward);
     }
 
-    function calculateReward() internal {
-    stakerDetail storage staker = stakers[msg.sender];
-    uint _Amount = staker.amount;
-    uint rewardTime = block.timestamp - staker.initialStaketime;   
-    uint reward = (rewardTime * 20 * _Amount) / (SECONDS_PER_YEAR * 100);
-    rewardTracker[msg.sender] += reward;  
-    staker.initialStaketime = block.timestamp;
-    }
-
-    function checkreward() public returns(uint){
-        calculateReward();
-    uint reward = rewardTracker[msg.sender];
-      emit rewardCheck(reward);
-      return reward;   
-    }
-    function trackreward() public view returns (uint) {
-        return rewardTracker[msg.sender];
-    }
-    function claimReward(uint _amount) public {
-        calculateReward();
-        
-        uint claimAbleAmount = rewardTracker[msg.sender];
-        require(rewardTracker[msg.sender] != 0, "You have no reward");
+    
+    function claimReward(uint _amount) public {  
+    stakerDetail memory stakerMem = stakers[msg.sender];
+        uint _Amount = stakerMem.amount;
+        uint rewardTime = block.timestamp - stakerMem.initialStaketime;   
+        uint reward = (rewardTime * 5 * _Amount) / (SECONDS_PER_YEAR * 100); 
+        stakerMem.initialStaketime = block.timestamp;
+        stakerMem.tokenEarned += reward;
+        uint claimAbleAmount = stakerMem.tokenEarned;
+        require( claimAbleAmount != 0, "You have no reward");
         require(_amount <= claimAbleAmount, "Can't withdraw more than your reward");
         require(_amount < rewardToken.balanceOf(address(this)), "check back to claim reward");
         if (_amount == claimAbleAmount){
             rewardToken.transfer(msg.sender, claimAbleAmount);
-             rewardTracker[msg.sender] = 0;
+             stakerMem.tokenEarned = 0;
+            stakers[msg.sender].tokenEarned = stakerMem.tokenEarned;
         }else {
             rewardToken.transfer(msg.sender, _amount);
            uint rewardLeft = claimAbleAmount - _amount;
-            rewardTracker[msg.sender] = rewardLeft;
+            stakerMem.tokenEarned = rewardLeft;
+            stakers[msg.sender].tokenEarned = stakerMem.tokenEarned;
         }
+    }
+
+    function withdrawStaking()public {
+        stakerDetail memory stakerMem = stakers[msg.sender];
+        uint _Amount = stakerMem.amount;
+        uint rewardTime = block.timestamp - stakerMem.initialStaketime;   
+        uint reward = (rewardTime * 20 * _Amount) / (SECONDS_PER_YEAR * 100); 
+        stakerMem.initialStaketime = block.timestamp;
+        stakerMem.tokenEarned += reward;
+       uint staked = stakerMem.amount;
+       uint rewardEarned = stakerMem.tokenEarned;
+       require(reward < rewardToken.balanceOf(address(this)), "check back to withdraw");
+       require(staked < allowedStakeToken.balanceOf(address(this)), "check back to withdraw");
+       allowedStakeToken.transfer(msg.sender, staked);
+       rewardToken.transfer(msg.sender, rewardEarned);
+       stakerMem.amount = 0;
+       stakerMem.initialStaketime = 0;
+       stakerMem.stakeStatus = false;
+       stakerMem.tokenEarned = 0;
+       stakers[msg.sender] = stakerMem;
     }
 
 function userInfo(address _user) external view returns (stakerDetail memory) {
         return stakers[_user];
     }
+
 
 }

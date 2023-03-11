@@ -1,0 +1,1 @@
+A Token stake contract with frontend integration
